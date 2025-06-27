@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Kriya Flowchart</title>
@@ -7,13 +8,17 @@
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/leader-line"></script>
 </head>
+
 <body>
   <div id="toolbar">
     <button id="add-task">+ Task</button>
     <button id="add-dist">+ Distraction</button>
     <button id="clear-all">🗑 Clear</button>
   </div>
-  <div id="canvas"></div>
+  <div id="canvas">
+    <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
   <script type="module" src="../src/app.js"></script>
 </body>
+
 </html>
