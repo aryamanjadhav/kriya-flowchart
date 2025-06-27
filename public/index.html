@@ -10,14 +10,29 @@
 </head>
 
 <body>
-  <div id="toolbar">
-    <button id="add-task">+ Task</button>
-    <button id="add-dist">+ Distraction</button>
-    <button id="clear-all">🗑 Clear</button>
+  <div id="app">
+    <!-- Left‐side vertical toolbar -->
+    <aside id="sidebar">
+      <button id="add-task">🎯</button>
+      <button id="add-dist">⚠️</button>
+      <button id="clear-all">🗑</button>
+
+      <button id="download-chart">📥</button>
+      <button id="upload-chart">📤</button>
+      <input id="file-input" type="file" accept=".json" style="display:none" />
+    </aside>
+
+    <!-- Main content: header + canvas -->
+    <main id="main">
+      <header id="page-header">
+        <h1 id="chart-title" contenteditable="true" spellcheck="false">My Flowchart</h1>
+      </header>
+      <div id="canvas">
+        <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
+      </div>
+    </main>
   </div>
-  <div id="canvas">
-    <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
-  </div>
+
   <script type="module" src="../src/app.js"></script>
 </body>
 
