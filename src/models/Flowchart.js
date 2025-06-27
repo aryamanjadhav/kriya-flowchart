@@ -13,16 +13,16 @@ export default class Flowchart {
     return n;
   }
 
-  addEdge(edgeProps) {
-    const e = new Edge(edgeProps);
+  addEdge(props) {
+    const e = new Edge({ style: 'normal', ...props });
     this.edges.push(e);
     return e;
   }
 
   toJSON() {
     return {
-      nodes: this.nodes.map(n=>n.toJSON()),
-      edges: this.edges.map(e=>e.toJSON())
+      nodes: this.nodes.map(n => n.toJSON()),
+      edges: this.edges.map(e => e.toJSON())
     };
   }
 
