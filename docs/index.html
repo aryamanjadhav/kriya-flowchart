@@ -1,31 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
   <title>Kriya Flowchart</title>
   <link rel="stylesheet" href="styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/leader-line"></script>
+  <style>
+    /* lock screen overlay */
+    #lock-screen {
+      position: fixed;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.85);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    #lock-box {
+      background: #fff; padding: 2rem; border-radius: 8px;
+      text-align: center; width: 280px;
+    }
+    #lock-box input {
+      width: 100%; padding: 0.5rem; margin: 0.5rem 0;
+      box-sizing: border-box;
+    }
+    #lock-box button {
+      padding: 0.5rem 1rem; cursor: pointer;
+    }
+    #lock-error {
+      color: #e74c3c; display: none; margin-top: 0.5rem;
+    }
+    /* hide the real app until unlocked */
+    #app { display: none; }
+  </style>
 </head>
 
 <body>
+  <!-- LOCK SCREEN -->
+  <div id="lock-screen">
+    <div id="lock-box">
+      <h2>Enter Access Code</h2>
+      <input id="access-code-input" type="password" placeholder="••••••" />
+      <button id="unlock-btn">Unlock</button>
+      <p id="lock-error">Incorrect code</p>
+    </div>
+  </div>
+
+  <!-- YOUR APP -->
   <div id="app">
-    <!-- Left‐side vertical toolbar -->
     <aside id="sidebar">
       <button id="add-task">🎯</button>
       <button id="add-dist">⚠️</button>
       <button id="clear-all">🗑</button>
-
       <button id="download-chart">📥</button>
       <button id="upload-chart">📤</button>
       <input id="file-input" type="file" accept=".json" style="display:none" />
     </aside>
-
-    <!-- Main content: header + canvas -->
     <main id="main">
       <header id="page-header">
-        <h1 id="chart-title" contenteditable="true" spellcheck="false">My Flowchart</h1>
+        <h1 id="chart-title" contenteditable spellcheck="false">My Flowchart</h1>
       </header>
       <div id="canvas">
         <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
@@ -33,7 +65,29 @@
     </main>
   </div>
 
-  <script type="module" src="src/app.js"></script>
-</body>
+  <script type="module">
+    import FlowController from './controllers/FlowController.js';
 
+    const SECRET = 'coca cola';  // client-side secrets can always be inspected!
+
+    function startApp() {
+      document.getElementById('lock-screen').style.display = 'none';
+      document.getElementById('app').style.display = '';
+      const ctrl = new FlowController();
+      ctrl.init();
+    }
+
+    document.getElementById('unlock-btn').onclick = () => {
+      const entry = document.getElementById('access-code-input').value.trim();
+      if (entry.toLowerCase() === SECRET) {
+        startApp();
+      } else {
+        document.getElementById('lock-error').style.display = 'block';
+      }
+    };
+    document.getElementById('access-code-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('unlock-btn').click();
+    });
+  </script>
+</body>
 </html>
