@@ -153,3 +153,13 @@ html, body {
 .node.selected {
   outline: 2px dashed #007bff;
 }
+
+#sidebar button#add-task {
+  color: #2ecc71 !important;   /* green */
+}
+#sidebar button#add-dist {
+  color: #f1c40f !important;   /* yellow */
+}
+#sidebar button#clear-all {
+  color: #e74c3c !important;   /* red */
+}

@@ -8,12 +8,12 @@ const DIST_COUNT = DIST_COLORS.length;
 
 export default class FlowController {
   constructor() {
-    this.service = new StorageService();
-    this.chart = new Flowchart();
-    this.linkStartId = null;
-    this.selectedNodeId = null;
+    this.service         = new StorageService();
+    this.chart           = new Flowchart();
+    this.linkStartId     = null;
+    this.selectedNodeId  = null;
+    this.showDistractions = true;
 
-    // Initialize the canvas (must match your HTML #canvas)
     this.canvas = new FlowCanvas(
       '#canvas',
       this.handleNodeMove.bind(this),
@@ -24,35 +24,36 @@ export default class FlowController {
       this.handleEdgeDblClick.bind(this)
     );
 
-    // Global key handler
     window.addEventListener('keydown', this.handleKeyDown.bind(this));
   }
 
   init() {
-    // Load from LocalStorage or start fresh
+    // Load saved chart (if any)
     const saved = this.service.load();
     if (saved) {
       this.chart = Flowchart.fromJSON(saved);
-      // back-compat: ensure every task has a status
       this.chart.nodes.forEach(n => {
         if (n.type === 'TASK' && !n.status) n.status = 'todo';
       });
     }
 
-    // Render chart title
+    // Render title and canvas
     document.getElementById('chart-title').innerText = this.chart.title;
-    // Render canvas
     this._renderAll();
 
-    // Toolbar buttons
-    document.getElementById('add-task').onclick = () => this.add('TASK');
-    document.getElementById('add-dist').onclick = () => this.add('DISTRACTION');
-    document.getElementById('clear-all').onclick = () => this.clearAll();
+    // Toolbar bindings
+    document.getElementById('add-task').onclick       = () => this.add('TASK');
+    document.getElementById('add-dist').onclick       = () => this.add('DISTRACTION');
+    document.getElementById('clear-all').onclick      = () => this.clearAll();
     document.getElementById('download-chart').onclick = () => this.exportChart();
-    document.getElementById('upload-chart').onclick = () =>
+    document.getElementById('upload-chart').onclick   = () =>
       document.getElementById('file-input').click();
 
-    // File-picker for upload
+    document
+      .getElementById('toggle-dist')
+      .addEventListener('click', this.toggleDistractions.bind(this));
+
+    // File upload
     document.getElementById('file-input').addEventListener('change', e => {
       const f = e.target.files[0];
       if (f) this.importChart(f);
@@ -61,9 +62,9 @@ export default class FlowController {
 
     // Title editing
     const titleEl = document.getElementById('chart-title');
-    titleEl.addEventListener('blur', () => {
-      this.handleTitleChange(titleEl.innerText.trim());
-    });
+    titleEl.addEventListener('blur', () =>
+      this.handleTitleChange(titleEl.innerText.trim())
+    );
     titleEl.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -71,130 +72,153 @@ export default class FlowController {
       }
     });
 
-    // Double‐click for linking
+    // Double‐click to link nodes
     this.canvas.container.addEventListener(
       'dblclick',
       this.handleCanvasDblClick.bind(this)
     );
   }
 
-  // ── Export / Download ───────────────────────────────
-  exportChart() {
-    // 1) serialize
-    const dataStr = JSON.stringify(this.chart.toJSON(), null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
+  // ── Hide/Show Distractions ─────────────────────────
+  toggleDistractions() {
+    this.showDistractions = !this.showDistractions;
+    console.log('toggleDistractions ->', this.showDistractions);
+  
+    const btn = document.getElementById('toggle-dist');
+    if (this.showDistractions) {
+      btn.innerText = '( ͒•·̫|';   // shown state
+      btn.title     = 'Hide distractions';
+    } else {
+      btn.innerText = '( ͒>·̫|';   // hidden state
+      btn.title     = 'Show distractions';
+    }
+  
+    this._renderAll();
+  }
 
-    // 2) sanitize title for use as filename
-    const rawTitle = this.chart.title || 'flowchart';
+  // ── Export to JSON and download ────────────────────
+  exportChart() {
+    const jsonStr = JSON.stringify(this.chart.toJSON(), null, 2);
+    const blob    = new Blob([jsonStr], { type: 'application/json' });
+    const url     = URL.createObjectURL(blob);
+
+    const rawTitle  = this.chart.title || 'flowchart';
     const safeTitle = rawTitle
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9\-_\s]/g, '')  // strip invalid chars
-      .replace(/\s+/g, '-')            // spaces → dashes
-      .substring(0, 50)                // limit length
-      || 'flowchart';
+      .replace(/[^a-z0-9\-_\s]/g, '')
+      .replace(/\s+/g, '-')
+      .substring(0, 50) || 'flowchart';
 
-    // 3) trigger download
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `${safeTitle}.json`;
+    a.href        = url;
+    a.download    = `${safeTitle}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
+  // ── Import from uploaded JSON ──────────────────────
   importChart(file) {
     const reader = new FileReader();
     reader.onload = event => {
       try {
-        // 1. Parse the uploaded JSON
         const data = JSON.parse(event.target.result);
-        // 2. Rehydrate the chart (including its title, nodes, edges)
         this.chart = Flowchart.fromJSON(data);
-        // 3. Persist to LocalStorage
         this.service.save(this.chart);
-        // 4. Update the page’s title element
-        const titleEl = document.getElementById('chart-title');
-        titleEl.innerText = this.chart.title;
-        // 5. Redraw everything on the canvas
+        document.getElementById('chart-title').innerText = this.chart.title;
         this._renderAll();
-      } catch (err) {
-        alert('Could not load flowchart: invalid file format.');
+      } catch {
+        alert('Invalid flowchart file.');
       }
     };
-    // Trigger reading the selected file as text
     reader.readAsText(file);
   }
 
-  // ── Title change handler ────────────────────────────
+  // ── Title change handler ───────────────────────────
   handleTitleChange(newTitle) {
     this.chart.title = newTitle || 'Untitled';
     this.service.save(this.chart);
   }
 
-  // ── Distraction‐bar click ───────────────────────────
+  // ── Distraction‐bar click cycles type ──────────────
   handleNodeDistTypeChange(nodeId) {
     const node = this.chart.nodes.find(n => n.id === nodeId);
     if (!node) return;
-    node.distractionType = ((node.distractionType || 0) + 1) % DIST_COUNT;
+    node.distractionType =
+      ((node.distractionType || 0) + 1) % DIST_COUNT;
     this.service.save(this.chart);
     this._renderAll();
   }
 
-  // ── Double‐click linking ─────────────────────────────
+  // ── Double‐click to link nodes ─────────────────────
   handleCanvasDblClick(e) {
     const nodeEl = e.target.closest('.node');
     if (!nodeEl) return;
     const id = nodeEl.id;
 
-    // Select on dbl‐click
     this.handleNodeSelect(id);
 
-    // Link flowchart logic
     if (!this.linkStartId) {
       this.linkStartId = id;
     } else if (this.linkStartId === id) {
-      this.linkStartId = null; // cancel
+      this.linkStartId = null;
     } else {
       const edgeId = `e${Date.now()}`;
-      this.chart.addEdge({ id: edgeId, sourceId: this.linkStartId, targetId: id });
+      this.chart.addEdge({
+        id: edgeId,
+        sourceId: this.linkStartId,
+        targetId: id
+      });
       this.service.save(this.chart);
       this.linkStartId = null;
       this._renderAll();
     }
   }
 
-  // ── Select / Deselect nodes ─────────────────────────
+  // ── Node selection helpers ─────────────────────────
   handleNodeSelect(id) {
     if (this.selectedNodeId) {
-      document.getElementById(this.selectedNodeId)?.classList.remove('selected');
+      document.getElementById(this.selectedNodeId)
+        .classList.remove('selected');
     }
     this.selectedNodeId = id;
     document.getElementById(id)?.classList.add('selected');
   }
   handleNodeDeselect() {
     if (!this.selectedNodeId) return;
-    document.getElementById(this.selectedNodeId)?.classList.remove('selected');
+    document.getElementById(this.selectedNodeId)
+      .classList.remove('selected');
     this.selectedNodeId = null;
   }
 
-  // ── Keyboard shortcuts ──────────────────────────────
+  // ── Keyboard shortcuts ─────────────────────────────
   handleKeyDown(e) {
-    // Ctrl+Shift+T → new task
-    if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 't') {
-      e.preventDefault(); this.add('TASK'); return;
+    if (
+      e.ctrlKey && e.shiftKey &&
+      !e.metaKey && !e.altKey &&
+      e.key.toLowerCase() === 't'
+    ) {
+      e.preventDefault();
+      this.add('TASK');
+      return;
     }
-    // Meta+D → new distraction
-    if (e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
-      e.preventDefault(); this.add('DISTRACTION'); return;
+    if (
+      e.metaKey && !e.shiftKey && !e.altKey &&
+      e.key.toLowerCase() === 'd'
+    ) {
+      e.preventDefault();
+      this.add('DISTRACTION');
+      return;
     }
-    // Alt + Delete/Backspace → delete selected
-    if (e.altKey && !e.ctrlKey && !e.metaKey &&
+    if (
+      e.altKey && !e.ctrlKey && !e.metaKey &&
       (e.key === 'Delete' || e.key === 'Backspace') &&
-      this.selectedNodeId) {
-      e.preventDefault(); this.deleteNode(this.selectedNodeId); return;
+      this.selectedNodeId
+    ) {
+      e.preventDefault();
+      this.deleteNode(this.selectedNodeId);
     }
   }
 
@@ -208,7 +232,7 @@ export default class FlowController {
     this._renderAll();
   }
 
-  // ── Node content handlers ───────────────────────────
+  // ── Node text / status / move handlers ────────────
   handleNodeTextChange(nodeId, text) {
     const node = this.chart.nodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -219,9 +243,9 @@ export default class FlowController {
   handleNodeStatusChange(nodeId) {
     const node = this.chart.nodes.find(n => n.id === nodeId);
     if (!node) return;
-    const order = ['todo', 'in-progress', 'done'];
-    const idx = order.indexOf(node.status || 'todo');
-    node.status = order[(idx + 1) % order.length];
+    const states = ['todo', 'in-progress', 'done'];
+    const idx    = states.indexOf(node.status || 'todo');
+    node.status  = states[(idx + 1) % states.length];
     this.service.save(this.chart);
     this._renderAll();
   }
@@ -230,13 +254,18 @@ export default class FlowController {
     const node = this.chart.nodes.find(n => n.id === id);
     node.x = x; node.y = y;
     this.service.save(this.chart);
-    this.canvas.renderEdges(this.chart.edges, this._nodeMap());
+    this.canvas.renderEdges(
+      this.chart.edges,
+      this._nodeMap(this.chart.nodes)
+    );
   }
 
   handleEdgeClick(edgeId) {
     const edge = this.chart.edges.find(e => e.id === edgeId);
-    edge.style = edge.style === 'normal' ? 'dotted'
-      : edge.style === 'dotted' ? 'reversed'
+    edge.style = edge.style === 'normal'
+      ? 'dotted'
+      : edge.style === 'dotted'
+        ? 'reversed'
         : 'normal';
     this.service.save(this.chart);
     this._renderAll();
@@ -248,6 +277,7 @@ export default class FlowController {
     this._renderAll();
   }
 
+  // ── Add / Clear ───────────────────────────────────
   add(type) {
     const id = `n${Date.now()}`;
     this.chart.addNode({
@@ -266,13 +296,23 @@ export default class FlowController {
     this._renderAll();
   }
 
+  // ── Render nodes & edges (with optional filtering) ─
   _renderAll() {
-    this.canvas.renderNodes(this.chart.nodes);
-    this.canvas.renderEdges(this.chart.edges, this._nodeMap());
+    const nodes = this.showDistractions
+      ? this.chart.nodes
+      : this.chart.nodes.filter(n => n.type !== 'DISTRACTION');
+
+    const vis = new Set(nodes.map(n => n.id));
+    const edges = this.chart.edges.filter(
+      e => vis.has(e.sourceId) && vis.has(e.targetId)
+    );
+
+    this.canvas.renderNodes(nodes);
+    this.canvas.renderEdges(edges, this._nodeMap(nodes));
   }
 
-  _nodeMap() {
-    return this.chart.nodes.reduce((map, n) => {
+  _nodeMap(nodes) {
+    return nodes.reduce((map, n) => {
       map[n.id] = document.getElementById(n.id);
       return map;
     }, {});

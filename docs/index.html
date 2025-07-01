@@ -11,17 +11,32 @@
 <body>
   <div id="app">
     <aside id="sidebar">
-      <button id="add-task">◎</button>
-      <button id="add-dist">⚠︎</button>
-      <button id="clear-all">☠</button>
-      <button id="download-chart">⬆</button>
-      <button id="upload-chart">⬇</button>
+      <!-- Add Task (green) -->
+      <button id="add-task"       title="Add Task"       style="color:#2ecc71">
+        ◎
+      </button>
+      <!-- Add Distraction (yellow) -->
+      <button id="add-dist"       title="Add Distraction" style="color:#f1c40f">
+        ⚠︎
+      </button>
+      <!-- Clear All (red) -->
+      <button id="clear-all"      title="Clear All"       style="color:#e74c3c">
+        ☠
+      </button>
+      <!-- Download / Upload -->
+      <button id="download-chart" title="Download Chart">⬇</button>
+      <button id="upload-chart"   title="Upload Chart">⬆</button>
+      <!-- Toggle distractions: Japanese‐style emoticon -->
+      <button id="toggle-dist"    title="Hide/Show Distractions">( ͒•·̫|</button>
+      <!-- hidden file input -->
       <input id="file-input" type="file" accept=".json" style="display:none" />
     </aside>
+
     <main id="main">
       <header id="page-header">
         <h1 id="chart-title" contenteditable spellcheck="false">My Flowchart</h1>
       </header>
+
       <div id="canvas">
         <svg id="edge-layer" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
