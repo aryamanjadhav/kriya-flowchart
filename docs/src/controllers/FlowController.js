@@ -380,7 +380,7 @@ export default class FlowController {
       e => visible.has(e.sourceId) && visible.has(e.targetId)
     );
 
-    this.canvas.renderNodes(nodes);
+    this.canvas.renderNodes(nodes,this.showDetails);
     this.canvas.renderEdges(edges, this._nodeMap(nodes));
   }
 

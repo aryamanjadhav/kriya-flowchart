@@ -69,7 +69,7 @@ export default class FlowCanvas {
     }
   }
 
-  renderNodes(nodes) {
+  renderNodes(nodes, showDetails = false) {
     // remove any existing .node DIVs
     this.container.querySelectorAll('.node').forEach(el => el.remove());
 
@@ -94,7 +94,7 @@ export default class FlowCanvas {
       el.appendChild(titleEl);
 
       // ── DETAILS: XP | Deadline | Completed
-      if (n.type === 'TASK') {
+      if (n.type === 'TASK' && showDetails) {
         const d = document.createElement('div');
         d.className = 'node-details';
         const xp  = n.xp ?? 0;
