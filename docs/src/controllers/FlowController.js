@@ -371,6 +371,30 @@ export default class FlowController {
 
   // ── Internal render: filters distractions if needed ──
   _renderAll() {
+
+    // ── XP progress ─────────────────────────────────────
+  const tasks = this.chart.nodes.filter(n => n.type === 'TASK');
+  const totalXP = tasks.reduce((sum, t) => sum + (t.xp || 0), 0);
+  const doneXP  = tasks
+    .filter(t => (t.status||'').toLowerCase() === 'done')
+    .reduce((sum, t) => sum + (t.xp || 0), 0);
+
+    const pct = totalXP > 0
+    ? Math.round((doneXP / totalXP) * 100)
+    : 0;
+  
+    const fillEl = document.getElementById('xp-bar-fill');
+    fillEl.style.width = pct + '%';
+    if (pct === 100) fillEl.classList.add('complete');
+    else            fillEl.classList.remove('complete');
+  
+  
+  // update bar fill width
+  document.getElementById('xp-bar-fill').style.width = pct + '%';
+  
+  // update percent text
+  document.getElementById('xp-percent').innerText = pct + '%';
+
     const nodes = this.showDistractions
       ? this.chart.nodes
       : this.chart.nodes.filter(n => n.type !== 'DISTRACTION');

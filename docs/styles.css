@@ -47,12 +47,14 @@ html, body {
 
 /* Page header for “Task Title” */
 #page-header {
-  height: 50px;
+  height: auto;
   background: #f1f1f1;
   display: flex;
-  align-items: center;
-  padding: 0 16px;
+  flex-direction: column;     /* stack title over bar */
+  align-items: flex-start;    /* left‐align both */
+  padding: 8px 16px;          /* give room top & bottom */
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  gap: 4px;                   /* space between title and bar */
 }
 #page-header h1 {
   margin: 0;
@@ -169,4 +171,31 @@ html, body {
   color: #aaa;
   margin-top: 4px;
   white-space: nowrap;
+}
+
+#xp-bar-container {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#xp-bar {
+  flex: 1;
+  height: 4px;
+  background: #ddd;
+  border-radius: 2px;
+  overflow: hidden;
+}
+#xp-bar-fill {
+  width: 0%;
+  height: 100%;
+  background: #666;
+  transition: width 0.3s ease;
+}
+#xp-bar-fill.complete {
+  background: #2ecc71;
+}
+#xp-percent {
+  font-size: 0.75rem;
+  color: #333;
 }
