@@ -73,6 +73,7 @@ export default class FlowController {
         this.showDetails = !this.showDetails;
         const btn = document.getElementById('toggle-details');
         btn.title = this.showDetails ? 'Hide Details' : 'Show Details';
+        this._renderAll();
       });
 
     // title editing
