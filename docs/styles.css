@@ -163,3 +163,10 @@ html, body {
 #sidebar button#clear-all {
   color: #e74c3c !important;   /* red */
 }
+
+.node-details {
+  font-size: 0.75rem;
+  color: #aaa;
+  margin-top: 4px;
+  white-space: nowrap;
+}

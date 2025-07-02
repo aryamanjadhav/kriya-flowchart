@@ -7,50 +7,91 @@ export default class Node {
    * @param {'TASK'|'DISTRACTION'} opts.type
    * @param {number} [opts.x=0]
    * @param {number} [opts.y=0]
-   * @param {string} [opts.status='TODO']          // for TASK
-   * @param {number|null} [opts.distractionType=null] // for DISTRACTION, index into your 8‐color array
+   * @param {string} [opts.status='TODO']              // for TASK
+   * @param {number|null} [opts.distractionType=null]   // for DISTRACTION
    * @param {string} [opts.title='']
+   * @param {number} [opts.xp=0]                        // new: experience points
+   * @param {string} [opts.deadline='']                 // new: ISO date string
+   * @param {string|null} [opts.completedTime=null]     // new: ISO datetime when marked COMPLETE
    */
-  constructor({ id, type, x = 0, y = 0, status = 'TODO', distractionType = null, title = '' }) {
-    this.id = id;
-    this.type = type;         // 'TASK' or 'DISTRACTION'
-    this.x = x;
-    this.y = y;
-    this.status = status;       // cycles through TODO → IN_PROGRESS → COMPLETE
+  constructor({
+    id,
+    type,
+    x = 0,
+    y = 0,
+    status = 'TODO',
+    distractionType = null,
+    title = '',
+    xp = 0,
+    deadline = '',
+    completedTime = null
+  }) {
+    this.id            = id;
+    this.type          = type;
+    this.x             = x;
+    this.y             = y;
+    this.status        = status;
     this.distractionType = distractionType;
-    this.title = title;
+    this.title         = title;
+    this.xp            = xp;
+    this.deadline      = deadline;
+    this.completedTime = completedTime;
   }
 
+  /**
+   * Cycle through TODO → IN_PROGRESS → COMPLETE.
+   * Automatically stamps `completedTime` when entering COMPLETE,
+   * and clears it if moving out of COMPLETE.
+   */
   cycleStatus() {
-    const states = ['TODO', 'IN_PROGRESS', 'COMPLETE'];
-    this.status = states[(states.indexOf(this.status) + 1) % states.length];
+    const states = ['todo', 'in-progress', 'done'];
+    const idx    = states.indexOf(this.status);
+    const next   = states[(idx + 1) % states.length];
+    this.status = next;
+
+    if (next === 'done') {
+      this.completedTime = new Date().toISOString();
+    } else {
+      this.completedTime = null;
+    }
   }
 
   toJSON() {
-    return {
-      id: this.id,
-      type: this.type,
-      title: this.title,
-      // only include status on TASK nodes
-      ...(this.type === 'TASK' && { status: this.status }),
-      // only include distractionType on DISTRACTION nodes
-      ...(this.type === 'DISTRACTION' && { distractionType: this.distractionType }),
-      // always include position so it persists
-      x: this.x,
-      y: this.y
+    // Always persist position & title
+    const out = {
+      id:    this.id,
+      type:  this.type,
+      x:     this.x,
+      y:     this.y,
+      title: this.title
     };
+
+    if (this.type === 'TASK') {
+      Object.assign(out, {
+        status:        this.status,
+        xp:            this.xp,
+        deadline:      this.deadline,
+        completedTime: this.completedTime
+      });
+    } else if (this.type === 'DISTRACTION') {
+      out.distractionType = this.distractionType;
+    }
+
+    return out;
   }
 
   static fromJSON(obj) {
-    // JSON may have { id, type, title, status?, distractionType?, x, y }
     return new Node({
-      id: obj.id,
-      type: obj.type,
-      title: obj.title,
-      status: obj.status,
+      id:              obj.id,
+      type:            obj.type,
+      x:               obj.x,
+      y:               obj.y,
+      title:           obj.title,
+      status:          obj.status,
       distractionType: obj.distractionType,
-      x: obj.x,
-      y: obj.y
+      xp:              obj.xp,
+      deadline:        obj.deadline,
+      completedTime:   obj.completedTime
     });
   }
 }

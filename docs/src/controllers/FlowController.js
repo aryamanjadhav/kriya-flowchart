@@ -8,12 +8,14 @@ const DIST_COUNT = DIST_COLORS.length;
 
 export default class FlowController {
   constructor() {
-    this.service         = new StorageService();
-    this.chart           = new Flowchart();
-    this.linkStartId     = null;
-    this.selectedNodeId  = null;
-    this.showDistractions = true;
+    this.service           = new StorageService();
+    this.chart             = new Flowchart();
+    this.linkStartId       = null;
+    this.selectedNodeId    = null;
+    this.showDistractions  = true;
+    this.showDetails = true;
 
+    // initialize canvas with all callbacks
     this.canvas = new FlowCanvas(
       '#canvas',
       this.handleNodeMove.bind(this),
@@ -28,39 +30,52 @@ export default class FlowController {
   }
 
   init() {
-    // Load saved chart (if any)
+    // -- load saved chart --
     const saved = this.service.load();
     if (saved) {
       this.chart = Flowchart.fromJSON(saved);
+      // back-compat: ensure every task has a status
       this.chart.nodes.forEach(n => {
-        if (n.type === 'TASK' && !n.status) n.status = 'todo';
+        if (n.type === 'TASK' && !n.status) n.status = 'TODO';
       });
     }
 
-    // Render title and canvas
+    // -- render title & canvas --
     document.getElementById('chart-title').innerText = this.chart.title;
     this._renderAll();
 
-    // Toolbar bindings
-    document.getElementById('add-task').onclick       = () => this.add('TASK');
-    document.getElementById('add-dist').onclick       = () => this.add('DISTRACTION');
-    document.getElementById('clear-all').onclick      = () => this.clearAll();
-    document.getElementById('download-chart').onclick = () => this.exportChart();
-    document.getElementById('upload-chart').onclick   = () =>
-      document.getElementById('file-input').click();
+    // -- toolbar buttons --
+    document.getElementById('add-task').onclick =
+      () => this.add('TASK');
+    document.getElementById('add-dist').onclick =
+      () => this.add('DISTRACTION');
+    document.getElementById('clear-all').onclick =
+      () => this.clearAll();
+    document.getElementById('download-chart').onclick =
+      () => this.exportChart();
+    document.getElementById('upload-chart').onclick =
+      () => document.getElementById('file-input').click();
 
-    document
-      .getElementById('toggle-dist')
+    document.getElementById('toggle-dist')
       .addEventListener('click', this.toggleDistractions.bind(this));
 
-    // File upload
-    document.getElementById('file-input').addEventListener('change', e => {
-      const f = e.target.files[0];
-      if (f) this.importChart(f);
-      e.target.value = '';
-    });
+    // file-picker for upload
+    document.getElementById('file-input')
+      .addEventListener('change', e => {
+        const f = e.target.files[0];
+        if (f) this.importChart(f);
+        e.target.value = '';
+      });
 
-    // Title editing
+      document
+      .getElementById('toggle-details')
+      .addEventListener('click', () => {
+        this.showDetails = !this.showDetails;
+        const btn = document.getElementById('toggle-details');
+        btn.title = this.showDetails ? 'Hide Details' : 'Show Details';
+      });
+
+    // title editing
     const titleEl = document.getElementById('chart-title');
     titleEl.addEventListener('blur', () =>
       this.handleTitleChange(titleEl.innerText.trim())
@@ -72,54 +87,137 @@ export default class FlowController {
       }
     });
 
-    // Double‐click to link nodes
+    // double-click for linking
     this.canvas.container.addEventListener(
       'dblclick',
       this.handleCanvasDblClick.bind(this)
     );
+
+    // ** right-click (contextmenu) for TASK properties **
+    this.canvas.container.addEventListener(
+      'contextmenu',
+      this.handleNodeContextMenu.bind(this)
+    );
   }
 
-  // ── Hide/Show Distractions ─────────────────────────
-  toggleDistractions() {
-    this.showDistractions = !this.showDistractions;
-    console.log('toggleDistractions ->', this.showDistractions);
+  handleNodeContextMenu(evt) {
+    evt.preventDefault();
+    const nodeEl = evt.target.closest('.node');
+    if (!nodeEl) return;
+    const node = this.chart.nodes.find(n => n.id === nodeEl.id);
+    if (!node || node.type !== 'TASK') return;
   
-    const btn = document.getElementById('toggle-dist');
-    if (this.showDistractions) {
-      btn.innerText = '( ͒•·̫|';   // shown state
-      btn.title     = 'Hide distractions';
-    } else {
-      btn.innerText = '( ͒>·̫|';   // hidden state
-      btn.title     = 'Show distractions';
+    // build form
+    const form = document.createElement('form');
+    form.style.position = 'fixed';
+    form.style.top      = `${evt.clientY}px`;
+    form.style.left     = `${evt.clientX}px`;
+    form.style.background    = '#fff';
+    form.style.padding       = '8px';
+    form.style.border        = '1px solid #ccc';
+    form.style.borderRadius  = '4px';
+    form.style.zIndex        = 10000;
+  
+    // prepare values
+    const xpVal     = node.xp ?? 0;
+    const dlVal     = node.deadline || '';
+    const doneVal   = node.completedTime
+      ? new Date(node.completedTime).toISOString().slice(0,16)
+      : new Date().toISOString().slice(0,16);
+  
+    // base form HTML
+    let html = `
+      <label>XP:
+        <input type="number" name="xp" value="${xpVal}" style="width:4em"/>
+      </label><br/>
+      <label>Deadline:
+        <input type="date" name="deadline" value="${dlVal}"/>
+      </label><br/>
+    `;
+  
+    // only show "completedTime" picker if status is 'done'
+    if ((node.status||'').toLowerCase()==='done') {
+      html += `
+        <label>Completed At:
+          <input type="datetime-local" name="completedTime" value="${doneVal}"/>
+        </label><br/>
+      `;
     }
   
+    html += `
+      <button type="submit">Save</button>
+      <button type="button" id="cancel">Cancel</button>
+    `;
+    form.innerHTML = html;
+  
+    // submit
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const data = new FormData(form);
+      node.xp            = parseInt(data.get('xp'), 10) || 0;
+      node.deadline      = data.get('deadline') || '';
+      if (data.has('completedTime')) {
+        const dt = data.get('completedTime');
+        node.completedTime = dt ? new Date(dt).toISOString() : null;
+      }
+      this.service.save(this.chart);
+      this._renderAll();
+      cleanup();
+    });
+  
+    // cancel
+    form.querySelector('#cancel').addEventListener('click', cleanup);
+  
+    // click outside to cancel
+    function onClickOutside(e) {
+      if (!form.contains(e.target)) cleanup();
+    }
+    window.addEventListener('mousedown', onClickOutside);
+  
+    function cleanup() {
+      form.remove();
+      window.removeEventListener('mousedown', onClickOutside);
+    }
+  
+    document.body.appendChild(form);
+  }
+
+  // ── Hide/Show distractions ───────────────────────────
+  toggleDistractions() {
+    this.showDistractions = !this.showDistractions;
+    const btn = document.getElementById('toggle-dist');
+    btn.innerText = this.showDistractions
+      ? '( ͒•·̫|'
+      : '( ͒>·̫|';
+    btn.title = this.showDistractions
+      ? 'Hide distractions'
+      : 'Show distractions';
     this._renderAll();
   }
 
-  // ── Export to JSON and download ────────────────────
+  // ── Export / Download JSON ───────────────────────────
   exportChart() {
     const jsonStr = JSON.stringify(this.chart.toJSON(), null, 2);
     const blob    = new Blob([jsonStr], { type: 'application/json' });
     const url     = URL.createObjectURL(blob);
 
     const rawTitle  = this.chart.title || 'flowchart';
-    const safeTitle = rawTitle
-      .trim()
+    const safeTitle = rawTitle.trim()
       .toLowerCase()
       .replace(/[^a-z0-9\-_\s]/g, '')
       .replace(/\s+/g, '-')
       .substring(0, 50) || 'flowchart';
 
     const a = document.createElement('a');
-    a.href        = url;
-    a.download    = `${safeTitle}.json`;
+    a.href     = url;
+    a.download = `${safeTitle}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
 
-  // ── Import from uploaded JSON ──────────────────────
+  // ── Import from uploaded JSON ───────────────────────
   importChart(file) {
     const reader = new FileReader();
     reader.onload = event => {
@@ -136,23 +234,22 @@ export default class FlowController {
     reader.readAsText(file);
   }
 
-  // ── Title change handler ───────────────────────────
+  // ── Title change handler ────────────────────────────
   handleTitleChange(newTitle) {
     this.chart.title = newTitle || 'Untitled';
     this.service.save(this.chart);
   }
 
-  // ── Distraction‐bar click cycles type ──────────────
+  // ── Distraction‐bar click cycles type ───────────────
   handleNodeDistTypeChange(nodeId) {
     const node = this.chart.nodes.find(n => n.id === nodeId);
     if (!node) return;
-    node.distractionType =
-      ((node.distractionType || 0) + 1) % DIST_COUNT;
+    node.distractionType = ((node.distractionType || 0) + 1) % DIST_COUNT;
     this.service.save(this.chart);
     this._renderAll();
   }
 
-  // ── Double‐click to link nodes ─────────────────────
+  // ── Double-click to link nodes ───────────────────────
   handleCanvasDblClick(e) {
     const nodeEl = e.target.closest('.node');
     if (!nodeEl) return;
@@ -166,62 +263,47 @@ export default class FlowController {
       this.linkStartId = null;
     } else {
       const edgeId = `e${Date.now()}`;
-      this.chart.addEdge({
-        id: edgeId,
-        sourceId: this.linkStartId,
-        targetId: id
-      });
+      this.chart.addEdge({ id: edgeId, sourceId: this.linkStartId, targetId: id });
       this.service.save(this.chart);
       this.linkStartId = null;
       this._renderAll();
     }
   }
 
-  // ── Node selection helpers ─────────────────────────
+  // ── Node selection helpers ──────────────────────────
   handleNodeSelect(id) {
     if (this.selectedNodeId) {
-      document.getElementById(this.selectedNodeId)
-        .classList.remove('selected');
+      document.getElementById(this.selectedNodeId)?.classList.remove('selected');
     }
     this.selectedNodeId = id;
     document.getElementById(id)?.classList.add('selected');
   }
   handleNodeDeselect() {
     if (!this.selectedNodeId) return;
-    document.getElementById(this.selectedNodeId)
-      .classList.remove('selected');
+    document.getElementById(this.selectedNodeId)?.classList.remove('selected');
     this.selectedNodeId = null;
   }
 
   // ── Keyboard shortcuts ─────────────────────────────
   handleKeyDown(e) {
-    if (
-      e.ctrlKey && e.shiftKey &&
-      !e.metaKey && !e.altKey &&
-      e.key.toLowerCase() === 't'
-    ) {
-      e.preventDefault();
-      this.add('TASK');
-      return;
+    // Ctrl+Shift+T → task
+    if (e.ctrlKey && e.shiftKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 't') {
+      e.preventDefault(); this.add('TASK'); return;
     }
-    if (
-      e.metaKey && !e.shiftKey && !e.altKey &&
-      e.key.toLowerCase() === 'd'
-    ) {
-      e.preventDefault();
-      this.add('DISTRACTION');
-      return;
+    // Meta+D → distraction
+    if (e.metaKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'd') {
+      e.preventDefault(); this.add('DISTRACTION'); return;
     }
-    if (
-      e.altKey && !e.ctrlKey && !e.metaKey &&
-      (e.key === 'Delete' || e.key === 'Backspace') &&
-      this.selectedNodeId
-    ) {
-      e.preventDefault();
-      this.deleteNode(this.selectedNodeId);
+    // Alt+Delete → delete
+    if (e.altKey && !e.ctrlKey && !e.metaKey &&
+        (e.key === 'Delete' || e.key === 'Backspace') &&
+        this.selectedNodeId) {
+      e.preventDefault(); this.deleteNode(this.selectedNodeId);
+      return;
     }
   }
 
+  // ── Delete a node and its edges ────────────────────
   deleteNode(id) {
     this.chart.nodes = this.chart.nodes.filter(n => n.id !== id);
     this.chart.edges = this.chart.edges.filter(
@@ -232,7 +314,7 @@ export default class FlowController {
     this._renderAll();
   }
 
-  // ── Node text / status / move handlers ────────────
+  // ── Node text / status / move handlers ─────────────
   handleNodeTextChange(nodeId, text) {
     const node = this.chart.nodes.find(n => n.id === nodeId);
     if (!node) return;
@@ -243,9 +325,7 @@ export default class FlowController {
   handleNodeStatusChange(nodeId) {
     const node = this.chart.nodes.find(n => n.id === nodeId);
     if (!node) return;
-    const states = ['todo', 'in-progress', 'done'];
-    const idx    = states.indexOf(node.status || 'todo');
-    node.status  = states[(idx + 1) % states.length];
+    node.cycleStatus();         // uses Node.cycleStatus() to update completedTime
     this.service.save(this.chart);
     this._renderAll();
   }
@@ -254,19 +334,15 @@ export default class FlowController {
     const node = this.chart.nodes.find(n => n.id === id);
     node.x = x; node.y = y;
     this.service.save(this.chart);
-    this.canvas.renderEdges(
-      this.chart.edges,
-      this._nodeMap(this.chart.nodes)
-    );
+    // update edges
+    this.canvas.renderEdges(this.chart.edges, this._nodeMap(this.chart.nodes));
   }
 
   handleEdgeClick(edgeId) {
     const edge = this.chart.edges.find(e => e.id === edgeId);
-    edge.style = edge.style === 'normal'
-      ? 'dotted'
-      : edge.style === 'dotted'
-        ? 'reversed'
-        : 'normal';
+    edge.style = edge.style === 'normal' ? 'dotted'
+               : edge.style === 'dotted' ? 'reversed'
+               : 'normal';
     this.service.save(this.chart);
     this._renderAll();
   }
@@ -277,14 +353,10 @@ export default class FlowController {
     this._renderAll();
   }
 
-  // ── Add / Clear ───────────────────────────────────
+  // ── Add / Clear ────────────────────────────────────
   add(type) {
     const id = `n${Date.now()}`;
-    this.chart.addNode({
-      id,
-      type,
-      title: type === 'TASK' ? 'New Task' : 'Distr.'
-    });
+    this.chart.addNode({ id, type, title: type === 'TASK' ? 'New Task' : 'Distr.' });
     this.service.save(this.chart);
     this._renderAll();
   }
@@ -296,15 +368,15 @@ export default class FlowController {
     this._renderAll();
   }
 
-  // ── Render nodes & edges (with optional filtering) ─
+  // ── Internal render: filters distractions if needed ──
   _renderAll() {
     const nodes = this.showDistractions
       ? this.chart.nodes
       : this.chart.nodes.filter(n => n.type !== 'DISTRACTION');
 
-    const vis = new Set(nodes.map(n => n.id));
-    const edges = this.chart.edges.filter(
-      e => vis.has(e.sourceId) && vis.has(e.targetId)
+    const visible = new Set(nodes.map(n => n.id));
+    const edges   = this.chart.edges.filter(
+      e => visible.has(e.sourceId) && visible.has(e.targetId)
     );
 
     this.canvas.renderNodes(nodes);
@@ -312,9 +384,9 @@ export default class FlowController {
   }
 
   _nodeMap(nodes) {
-    return nodes.reduce((map, n) => {
-      map[n.id] = document.getElementById(n.id);
-      return map;
+    return nodes.reduce((m, n) => {
+      m[n.id] = document.getElementById(n.id);
+      return m;
     }, {});
   }
 }
