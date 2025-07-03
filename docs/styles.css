@@ -114,7 +114,7 @@ html, body {
   color: #000;
   /* ensure a bit of bottom padding so bar doesn’t overlap text */
   padding-bottom: 6px;
-  position: relative; /* for bar positioning */
+  position: absolute; /* for bar positioning */
 }
 
 /* Distraction color-bar pinned at bottom */

@@ -357,7 +357,13 @@ export default class FlowController {
   // ── Add / Clear ────────────────────────────────────
   add(type) {
     const id = `n${Date.now()}`;
-    this.chart.addNode({ id, type, title: type === 'TASK' ? 'New Task' : 'Distr.' });
+    this.chart.addNode({
+      id,
+      type,
+      title: type === 'TASK' ? 'New Task' : 'Distr.',
+      x: 0,
+      y: 0
+    });
     this.service.save(this.chart);
     this._renderAll();
   }
