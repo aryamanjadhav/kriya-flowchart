@@ -197,26 +197,43 @@ export default class FlowController {
   }
 
   // ── Export / Download JSON ───────────────────────────
-  exportChart() {
-    const jsonStr = JSON.stringify(this.chart.toJSON(), null, 2);
-    const blob    = new Blob([jsonStr], { type: 'application/json' });
-    const url     = URL.createObjectURL(blob);
+  // src/controllers/FlowController.js
+async exportChart() {
+  const dataStr = JSON.stringify(this.chart.toJSON(), null, 2);
 
-    const rawTitle  = this.chart.title || 'flowchart';
-    const safeTitle = rawTitle.trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\-_\s]/g, '')
-      .replace(/\s+/g, '-')
-      .substring(0, 50) || 'flowchart';
+  // 1) show the save-file picker
+  try {
+    const handle = await window.showSaveFilePicker({
+      suggestedName: (this.chart.title || 'flowchart')
+                       .trim()
+                       .toLowerCase()
+                       .replace(/[^a-z0-9\-_ ]/g, '')
+                       .replace(/\s+/g, '-') + '.json',
+      types: [{
+        description: 'JSON Flowchart',
+        accept: { 'application/json': ['.json'] }
+      }]
+    });
 
-    const a = document.createElement('a');
+    // 2) write to it
+    const writable = await handle.createWritable();
+    await writable.write(dataStr);
+    await writable.close();
+  } catch (err) {
+    // user probably cancelled; fallback to classic download link
+    console.warn('Save picker cancelled or not supported, falling back to download link.', err);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
     a.href     = url;
-    a.download = `${safeTitle}.json`;
+    a.download = `${handle?.name || 'flowchart'}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+}
+
 
   // ── Import from uploaded JSON ───────────────────────
   importChart(file) {
